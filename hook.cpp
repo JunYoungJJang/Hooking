@@ -12,13 +12,15 @@ typedef int (WINAPI *pfnOrg)(int arg1, int arg2);
 void hook();
 void unhook();
 
-int newFunc()
+void newFunc(char* arg1, LPVOID arg2)
 {
 	HANDLE hThread;
 	CONTEXT ctx;
 
-	int ret;
-	int* str;
+	int* ret;
+	char* str;
+
+	__asm pushad;   // pushad
 
 	OutputDebugString(L"Hello kakao");
 
@@ -26,20 +28,19 @@ int newFunc()
 	ctx.ContextFlags = CONTEXT_CONTROL;
 	GetThreadContext(hThread, &ctx);
 
-	str = (int*)((*(int *)ctx.Ebp) + 0x8);
-	FILE * fp = fopen("C:\\Users\\c450\\Documents\\test2.txt", "wt");
-	fprintf(fp, "%s", (char*)(*str));
+	str = arg1;
+	FILE * fp = fopen("C:\\users\\c450\\Documents\\test2.txt", "wt");
+	fprintf(fp, "%s", str);
 	fclose(fp);
+
+	OutputDebugString(L"Bye kakao");
 
 	unhook();
 
-	OutputDebugString(L"Bye kakako");
-	ret = ((pfnOrg)g_pfnOrg)(*((int *)ctx.Ebp) + 0x8, (*(int *)ctx.Ebp) + 0xc);
-	// call org;
+	ret = (int *) (*((int *)ctx.Ebp + 2) + 0x4);   // ebp + 0x4
+	*ret = *ret - 5;
 
-	hook();
-
-	return ret;
+	__asm popad;   // popad
 }
 
 void hook()
@@ -94,7 +95,8 @@ DWORD WINAPI ThreadProc(LPVOID lParam)
 		arr[i++] = *ptr++;
 	}
 
-	FILE * fp = fopen("C:\\Users\\c450\\Documents\\test.txt", "wt");
+	FILE * fp = fopen("C:\\users\\c450\\Documents\\test.txt", "wt");
+	// Documents\\test.txt
 
 	for (int i = 0; i < sizeof(arr); i++) {
 		fprintf(fp, "%x ", arr[i]);
