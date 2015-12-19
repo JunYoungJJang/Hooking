@@ -2,10 +2,12 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "tchar.h"
+#include "Shlobj.h"
 
 HMODULE g_hMod = NULL;
 BYTE g_org[5] = { 0, };
 FARPROC g_pfnOrg;
+char path[MAX_PATH] = { 0, };
 
 typedef int (WINAPI *pfnOrg)(int arg1, int arg2);
 
@@ -29,7 +31,7 @@ void newFunc(char* arg1, LPVOID arg2)
 	GetThreadContext(hThread, &ctx);
 
 	str = arg1;
-	FILE * fp = fopen("C:\\users\\c450\\Documents\\test2.txt", "wt");
+	FILE * fp = fopen(strcat(path, "\\Documents\\test.txt"), "wt");
 	fprintf(fp, "%s", str);
 	fclose(fp);
 
@@ -49,6 +51,10 @@ void hook()
 	BYTE* ptr = (BYTE*)(0x400000 + 0x33A364), *temp;
 
 	OutputDebugString(L"Hook function start");
+
+	if (g_org[0]) {   // already hooked!
+		return;
+	}
 
 	pfn = *((DWORD*)(ptr + 1)) + 5 + (0x400000 + 0x33A364);
 	g_pfnOrg = (FARPROC)pfn;
@@ -95,14 +101,7 @@ DWORD WINAPI ThreadProc(LPVOID lParam)
 		arr[i++] = *ptr++;
 	}
 
-	FILE * fp = fopen("C:\\users\\c450\\Documents\\test.txt", "wt");
-	// Documents\\test.txt
-
-	for (int i = 0; i < sizeof(arr); i++) {
-		fprintf(fp, "%x ", arr[i]);
-	}
-	
-	fclose(fp);
+	SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, path);
 
 	hook();
 
