@@ -198,7 +198,7 @@ BOOL WINAPI NewCreateProcessA(
                                      lpProcessInformation);
 
     // kakaotalk.exe에 hook.dll 을 인젝션 시킴
-    if( bRet && !strcmp(lpApplicationName, "kakaotalk.exe" )
+    if( bRet && !strcmp((const char*)lpApplicationName, "kakaotalk.exe") )
         InjectDll2(lpProcessInformation->hProcess, STR_MODULE_NAME);
 
     return bRet;
@@ -235,7 +235,7 @@ BOOL WINAPI NewCreateProcessW(
                                      lpProcessInformation);
 
     // kakaotalk.exe 실행시 hook.dll 을 인젝션 시킴
-    if( bRet && !_wstrcmp(lpApplicationName, kakaotalk.exe) )
+    if( bRet && !_tcscmp(lpApplicationName, L"kakaotalk.exe") )
         InjectDll2(lpProcessInformation->hProcess, STR_MODULE_NAME);
 
     return bRet;
